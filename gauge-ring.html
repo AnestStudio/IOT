@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environmental Sensors Dashboard</title>
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+  <style>
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    
+    h2 {
+      text-align: center;
+    }
+    
+    .wapper {
+      width: 380px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wapper">
+    <h2>Monitor System</h3>
+      <div id="container" style="height: 380px"></div>
+  </div>
+  <div>
+    <button>Clear</button>
+  </div>
+
+  <script type="text/javascript">
+    var dom = document.getElementById('container');
+
+    var myChart = echarts.init(dom, null, {
+      renderer: 'canvas',
+      useDirtyRect: false
+    });
+
+    var app = {};
+    var option;
+
+    const gaugeData = [{
+      value: 20,
+      name: 'Air humidity',
+      title: {
+        offsetCenter: ['0%', '-43%']
+      },
+      detail: {
+        valueAnimation: true,
+        offsetCenter: ['0%', '-28%'],
+        formatter: '{value}%'
+      },
+      itemStyle: {
+        borderWidth: 1,
+        borderColor: '#464646',
+        color: '#0d6efd'
+      }
+    }, {
+      value: 40,
+      name: 'Soil moisture',
+      title: {
+        offsetCenter: ['0%', '-10%']
+      },
+      detail: {
+        valueAnimation: true,
+        offsetCenter: ['0%', '5%'],
+        formatter: '{value}%'
+      },
+      itemStyle: {
+        borderWidth: 1,
+        borderColor: '#464646',
+        color: '#9bcc79'
+      }
+    }, {
+      value: 60,
+      name: 'Temperature',
+      title: {
+        offsetCenter: ['0%', '23%']
+      },
+      detail: {
+        valueAnimation: true,
+        offsetCenter: ['0%', '38%'],
+        formatter: '{value}°C'
+      },
+      itemStyle: {
+        borderWidth: 1,
+        borderColor: '#464646',
+        color: '#dc3545'
+      }
+    }];
+
+    option = {
+      series: [{
+        type: 'gauge',
+        startAngle: 90,
+        endAngle: -270,
+        radius: '90%',
+        pointer: {
+          show: false
+        },
+        progress: {
+          show: true,
+          overlap: false,
+          roundCap: true,
+          clip: false
+        },
+        axisLine: {
+          lineStyle: {
+            width: 70
+          }
+        },
+        splitLine: {
+          show: false,
+          distance: 0,
+          length: 10
+        },
+        axisTick: {
+          show: false
+        },
+        axisLabel: {
+          show: false,
+          distance: 50
+        },
+        data: gaugeData,
+        title: {
+          fontSize: 14
+        },
+        detail: {
+          width: 60,
+          height: 18,
+          fontSize: 18,
+          color: '#fff',
+          borderColor: 'inherit',
+          backgroundColor: 'inherit',
+          borderRadius: 20,
+          borderWidth: 1
+        }
+      }]
+    };
+
+    setInterval(function() {
+      gaugeData[0].value = +(Math.random() * 100).toFixed(2);
+      gaugeData[1].value = +(Math.random() * 100).toFixed(2);
+      gaugeData[2].value = +(Math.random() * 100).toFixed(2);
+
+      myChart.setOption({
+        series: [{
+          data: gaugeData,
+          pointer: {
+            show: false
+          }
+        }]
+      });
+    }, 3000);
+
+    if (option && typeof option === 'object') {
+      myChart.setOption(option);
+    }
+
+    window.addEventListener('resize', myChart.resize);
+  </script>
+</body>
+
+</html>

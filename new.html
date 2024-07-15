@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Environmental Sensors Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+    
+    .container {
+      width: 380px;
+    }
+    
+    .chart {
+      width: 100%;
+      height: 200px;
+    }
+    
+    .d-flex {
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="d-flex">
+      <div id="air-humidity" class="chart"></div>
+      <div id="soil-humidity" class="chart"></div>
+    </div>
+    <div class="d-flex">
+      <div id="temperature" class="chart"></div>
+      <div id="wind-speed" class="chart"></div>
+    </div>
+  </div>
+  <script>
+    const airHumidityChart = echarts.init(document.getElementById('air-humidity'));
+    const soilHumidityChart = echarts.init(document.getElementById('soil-humidity'));
+    const temperatureChart = echarts.init(document.getElementById('temperature'));
+    const windSpeedChart = echarts.init(document.getElementById('wind-speed'));
+
+    function createGaugeOption(name, value) {
+      return {
+        series: [{
+          type: 'gauge',
+          progress: {
+            show: true,
+            width: 10
+          },
+          axisLine: {
+            lineStyle: {
+              width: 10
+            }
+          },
+          axisTick: {
+            show: false
+          },
+          splitLine: {
+            length: 10,
+            lineStyle: {
+              width: 2,
+              color: '#999'
+            }
+          },
+          axisLabel: {
+            distance: 15,
+            color: '#999',
+            fontSize: 8
+          },
+          anchor: {
+            show: true,
+            showAbove: true,
+            size: 20,
+            itemStyle: {
+              borderWidth: 8
+            }
+          },
+          title: {
+            show: false
+          },
+          detail: {
+            valueAnimation: true,
+            fontSize: 20,
+            offsetCenter: [0, '70%']
+          },
+          data: [{
+            value: value,
+            name: name
+          }]
+        }]
+      };
+    }
+
+    function updateCharts() {
+      const airHumidity = Math.floor(Math.random() * 100);
+      const soilHumidity = Math.floor(Math.random() * 100);
+      const temperature = Math.floor(Math.random() * 100);
+      const windSpeed = Math.floor(Math.random() * 100);
+
+      airHumidityChart.setOption(createGaugeOption('Air Humidity', airHumidity));
+      soilHumidityChart.setOption(createGaugeOption('Soil Humidity', soilHumidity));
+      temperatureChart.setOption(createGaugeOption('Temperature', temperature));
+      windSpeedChart.setOption(createGaugeOption('Wind Speed', windSpeed));
+    }
+
+    setInterval(updateCharts, 2000);
+    updateCharts();
+  </script>
+</body>
+
+</html>

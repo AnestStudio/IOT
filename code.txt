@@ -1,0 +1,500 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <Ticker.h>
+
+#include <DHT.h>
+#define SOIL_SENSOR_PIN A0
+#define DHTTYPE DHT22
+#define DHTPIN 2
+
+DHT dht(DHTPIN, DHTTYPE);
+
+// Wifi info
+const char* ssid = "FPT Telecom";
+const char* password = "88888888";
+
+// Webserver, port 80
+ESP8266WebServer server(80);
+
+// LED
+const int LED_PIN = 0;
+bool ledState = false;
+bool blinkState = false;
+Ticker ticker;
+
+const char* html = R"html(
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+    
+    .container {
+      margin: 0 auto;
+      max-width: 360px;
+    }
+    
+    .title {
+      text-align: center;
+      font-size: 14px;
+    }
+    
+    .highcharts-figure {
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .highcharts-figure .chart-container {
+      width: 180px;
+      height: 140px;
+      float: left;
+    }
+    
+    .highcharts-figure,
+    .highcharts-data-table table {
+      width: 360px;
+      margin: 0 auto;
+    }
+    
+    .highcharts-data-table table {
+      font-family: Verdana, sans-serif;
+      border-collapse: collapse;
+      border: 1px solid #ebebeb;
+      margin: 10px auto;
+      text-align: center;
+      width: 100%;
+      max-width: 500px;
+    }
+    
+    .highcharts-data-table caption {
+      padding: 1em 0;
+      font-size: 1.2em;
+      color: #555;
+    }
+    
+    .highcharts-data-table th {
+      font-weight: 600;
+      padding: 0.5em;
+    }
+    
+    .highcharts-data-table td,
+    .highcharts-data-table th,
+    .highcharts-data-table caption {
+      padding: 0.5em;
+    }
+    
+    .highcharts-data-table thead tr,
+    .highcharts-data-table tr:nth-child(even) {
+      background: #f8f8f8;
+    }
+    
+    .highcharts-data-table tr:hover {
+      background: #f1f7ff;
+    }
+    
+    .highcharts-credits {
+      display: none;
+    }
+    
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+      margin: 10px;
+    }
+    
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked+.slider {
+      background-color: #2196F3;
+    }
+    
+    input:checked+.slider:before {
+      transform: translateX(26px);
+    }
+    
+    .btn {
+      display: flex;
+      align-items: center;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 4px;
+      background-color: #eeeeee;
+      margin-top: 16px;
+    }
+
+    .panel {
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 8px;
+      background-color: #eeeeee;
+      margin-top: 16px;
+    }
+  </style>
+
+  <script>
+    function toggleLED(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/led/on', true);
+      } else {
+        xhr.open('GET', '/led/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleBlink(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/led/blink', true);
+      } else {
+        xhr.open('GET', '/led/stop', true);
+      }
+      xhr.send();
+    }
+  </script>
+</head>
+
+<body>
+  <div class="container">
+    <h2 style="text-align: center; border-bottom: 1px solid #ccc; padding-bottom: 20px;">Monitor System</h2>
+    <figure class="highcharts-figure">
+      <div>
+        <div class="title">Temperature</div>
+        <div id="container-temperature" class="chart-container"></div>
+      </div>
+      <div>
+        <div class="title">Air Humidity</div>
+        <div id="container-air-humidity" class="chart-container"></div>
+      </div>
+    </figure>
+
+    <div class="btn">
+      <div class="switch">
+        <input type="checkbox" id="led_on" onchange='toggleLED(this)' " + String(ledState ? "checked" : "") + ">
+        <label for="led_on" class="slider"></label>
+      </div>
+      <div>Turn ON</div>
+    </div>
+
+    <div class="btn">
+      <div class="switch">
+        <input type="checkbox" id="led_off" onchange='toggleBlink(this)' " + String(blinkState ? "checked" : "") + ">
+        <label for="led_off" class="slider"></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="info></div>
+    </div>
+  </div>
+
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/highcharts-more.js"></script>
+  <script src="https://code.highcharts.com/modules/solid-gauge.js"></script>
+  <script src="https://code.highcharts.com/modules/exporting.js"></script>
+  <script src="https://code.highcharts.com/modules/export-data.js"></script>
+  <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+
+  <script>
+    const gaugeOptions = {
+      chart: {
+        type: 'solidgauge'
+      },
+      title: null,
+      pane: {
+        center: ['50%', '85%'],
+        size: '140%',
+        startAngle: -90,
+        endAngle: 90,
+        background: {
+          backgroundColor: Highcharts.defaultOptions.legend.backgroundColor || '#fafafa',
+          borderRadius: 5,
+          innerRadius: '60%',
+          outerRadius: '100%',
+          shape: 'arc'
+        }
+      },
+      exporting: {
+        enabled: false
+      },
+      tooltip: {
+        enabled: false
+      },
+      // the value axis
+      yAxis: {
+        stops: [
+          [0.1, '#55BF3B'], // green
+          [0.5, '#DDDF0D'], // yellow
+          [0.9, '#DF5353'] // red
+        ],
+        lineWidth: 0,
+        tickWidth: 0,
+        minorTickInterval: null,
+        tickAmount: 2,
+        title: {
+          y: -70
+        },
+        labels: {
+          y: 16
+        }
+      },
+      plotOptions: {
+        solidgauge: {
+          borderRadius: 3,
+          dataLabels: {
+            y: 5,
+            borderWidth: 0,
+            useHTML: true
+          }
+        }
+      }
+    };
+
+    // The temperature gauge
+    const chartTemperature = Highcharts.chart(
+      'container-temperature', Highcharts.merge(gaugeOptions, {
+        yAxis: {
+          min: 0,
+          max: 100,
+          title: {
+            text: 'Temperature'
+          }
+        },
+        credits: {
+          enabled: false
+        },
+        series: [{
+          name: 'Temperature',
+          data: [1],
+          dataLabels: {
+            format: '<div style="text-align:center">' +
+              '<span style="font-size:22px">{y:.1f}</span><br/>' +
+              '<span style="font-size:12px;opacity:0.4">&deg;C</span>' +
+              '</div>'
+          },
+          tooltip: {
+            valueSuffix: ' &deg;C'
+          }
+        }]
+      })
+    );
+
+    // The air humidity gauge
+    const chartAirHumidity = Highcharts.chart(
+      'container-air-humidity', Highcharts.merge(gaugeOptions, {
+        yAxis: {
+          min: 0,
+          max: 100,
+          title: {
+            text: 'Air Humidity'
+          }
+        },
+        series: [{
+          name: 'Air Humidity',
+          data: [1],
+          dataLabels: {
+            format: '<div style="text-align:center">' +
+              '<span style="font-size:22px">{y:.1f}</span><br/>' +
+              '<span style="font-size:12px;opacity:0.4">' +
+              '%' +
+              '</span>' +
+              '</div>'
+          },
+          tooltip: {
+            valueSuffix: ' %'
+          }
+        }]
+      })
+    );
+
+    // Bring life to the dials
+    setInterval(function() {
+
+      let point;
+      let r1, r2, r3;
+
+      var xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          r1 = this.responseText.split('-')[0];
+          r2 = this.responseText.split('-')[1];
+          r3 = this.responseText.split('-')[2];
+          
+          if (chartTemperature) {
+            point = chartTemperature.series[0].points[0];
+            point.update(parseFloat(r2));
+          }
+
+          // Air humidity
+          if (chartAirHumidity) {
+            point = chartAirHumidity.series[0].points[0];
+            point.update(parseFloat(r3));
+          }
+
+          // Soil humidity
+          // if (chartSoilHumidity) {
+          //   point = chartSoilHumidity.series[0].points[0];
+          //   point.update(parseFloat(r1));
+          // }
+        }
+      };
+      xhr.open('GET', '/monitor', true);
+      xhr.send();
+
+    }, 3000);
+
+  </script>
+</body>
+
+</html>
+)html";
+
+void handleRoot() {
+  server.send(200, "text/html", html);
+}
+
+void handleLedOn() {
+  blinkState = false;
+  ticker.detach();
+  ledState = true;
+  digitalWrite(LED_PIN, HIGH);
+  server.send(200, "text/plain", "LED is ON");
+}
+
+void handleLedOff() {
+  blinkState = false;
+  ticker.detach();
+  ledState = false;
+  digitalWrite(LED_PIN, LOW);
+  server.send(200, "text/plain", "LED is OFF");
+}
+
+void handleNotFound() {
+  server.send(404, "text/plain", "Page not found!");
+}
+
+void toggleLED() {
+  ledState = !ledState;
+  digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+}
+
+void handleLedBlink() {
+  blinkState = true;
+  ticker.attach(0.5, toggleLED);
+  server.send(200, "text/plain", "LED is BLINKING");
+}
+
+void handleLedStop() {
+  blinkState = false;
+  ticker.detach(); 
+  digitalWrite(LED_PIN, LOW);
+  server.send(200, "text/plain", "LED stopped BLINKING");
+}
+
+void handleMonitor() {
+  int soilMoistureValue = analogRead(SOIL_SENSOR_PIN);
+  float soilMoisturePercent = map(soilMoistureValue, 0, 1023, 0, 100);
+
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  if (isnan(h) || isnan(t)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  server.send(200, "text/plain", String(soilMoisturePercent) + '-' + String(t) + '-' + String(h));
+  if (h > 40) {
+    handleLedBlink();
+  } else {
+    handleLedStop();
+  }
+}
+
+void setupServer() {
+  // Connect Wifi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleRoot);
+
+  // LED
+  server.on("/led/on", handleLedOn);
+  server.on("/led/off", handleLedOff);
+  server.on("/led/blink", handleLedBlink);
+  server.on("/led/stop", handleLedStop);
+
+  // SENSOR
+  server.on("/monitor", handleMonitor);
+
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+  Serial.println("Webserver started");
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(SOIL_SENSOR_PIN, INPUT);
+    
+  dht.begin();
+
+  // Off LED
+  digitalWrite(LED_PIN, LOW);
+
+  setupServer();
+}
+
+void loop() {
+  server.handleClient();
+}
