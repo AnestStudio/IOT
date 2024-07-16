@@ -1,0 +1,77 @@
+<!--
+	THIS EXAMPLE WAS DOWNLOADED FROM https://echarts.apache.org/examples/en/editor.html?c=line-stack
+-->
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+
+<head>
+  <meta charset="utf-8">
+</head>
+
+<body style="height: 100%; margin: 0">
+  <div id="chartReport" style="height: 100%"></div>
+
+
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+
+
+  <script type="text/javascript">
+    const domChartReport = document.getElementById('chartReport');
+    const chartReport = echarts.init(domChartReport, null, {
+      renderer: 'canvas',
+      useDirtyRect: false
+    });
+
+    const optionChartReport = {
+      title: {
+        text: 'Stacked Line'
+      },
+      tooltip: {
+        trigger: 'axis'
+      },
+      legend: {
+        data: ['Air humidity', 'Soil humidity', 'Temperature']
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+      },
+      toolbox: {
+        feature: {
+          saveAsImage: {}
+        }
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: ['0h', '2h', '4h', '6h', '8h', '10h', '12h', '14h', '16h', '18h', '20h', '22h'],
+      },
+      yAxis: {
+        type: 'value'
+      },
+      series: [{
+        name: 'Air humidity',
+        type: 'line',
+        data: [55, 52, 57, 66, 48, 55, 64, 71, 73, 59, 65, 69]
+      }, {
+        name: 'Soil humidity',
+        type: 'line',
+        data: [45, 42, 57, 46, 58, 65, 64, 51, 63, 79, 75, 49]
+      }, {
+        name: 'Temperature',
+        type: 'line',
+        data: [24, 22, 27, 22, 18, 21, 24, 27, 23, 19, 25, 29]
+      }]
+    };
+
+    if (optionChartReport && typeof optionChartReport === 'object') {
+      chartReport.setOption(optionChartReport);
+    }
+
+    window.addEventListener('resize', chartReport.resize);
+  </script>
+</body>
+
+</html>

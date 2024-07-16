@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fetch Temperature Data</title>
+</head>
+
+<body>
+  <div>
+    <h1>Temperature Data</h1>
+    <form id="temperatureForm">
+      <label for="date">Select Date:</label>
+      <input type="date" id="date" name="date" value="2024-06-02" required>
+      <button type="submit">Get Temperature</button>
+    </form>
+    <div id="temperatureData"></div>
+  </div>
+
+  <script>
+    document.getElementById('temperatureForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const date = document.getElementById('date').value;
+      const [year, month, day] = date.split('-');
+
+      fetch(`http://localhost:8088/api/temperatures/day?day=${day}&month=${month}&year=${year}`)
+        .then(response => response.json())
+        .then(data => {
+          const keys = Object.keys(data).slice(4);
+          const values = Object.values(data).slice(4);
+
+          const hourKeys = Array.from({
+            length: 24
+          }, (_, i) => `${i}h`);
+
+          console.log("Keys:", hourKeys);
+          console.log("Values:", values);
+        })
+        .catch(error => {
+          console.error('Error fetching temperature data:', error);
+        });
+    });
+  </script>
+</body>
+
+</html>
