@@ -1,4 +1,32 @@
-<!DOCTYPE html>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+#include <DHT.h>
+#define SOIL_SENSOR_PIN A0
+#define DHTTYPE DHT22
+#define DHTPIN 2
+
+DHT dht(DHTPIN, DHTTYPE);
+
+// Wifi info
+const char* ssid = "FPT Telecom";
+const char* password = "88888888";
+
+// Webserver, port 80
+ESP8266WebServer server(80);
+
+// LED
+const int LED_PIN_D3_FAN = 0;
+const int LED_PIN_D2_LIGHT = 4;
+
+// State
+bool autoState = true;
+bool lightState = false;
+bool fanState = false;
+bool waterState = false;
+
+const char* html = R"html(
+  <!DOCTYPE html>
 <html lang="en" style="height: 100%">
 
 <head>
@@ -310,6 +338,7 @@
           </tr>
         </table>
       </div>
+
     </div>
 
     <div id="Tab2" class="tab-content">
@@ -655,6 +684,163 @@
     });
   </script>
 
+  <script type="text/javascript">
+    function toggleLight(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/light/on', true);
+      } else {
+        xhr.open('GET', '/light/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleAutoState(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/auto/on', true);
+      } else {
+        xhr.open('GET', '/auto/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleFan(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/fan/on', true);
+      } else {
+        xhr.open('GET', '/fan/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleWater(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/water/on', true);
+      } else {
+        xhr.open('GET', '/water/off', true);
+      }
+      xhr.send();
+    }
+  </script>
 </body>
 
 </html>
+)html";
+
+void handleRoot() {
+  server.send(200, "text/html", html);
+}
+
+// STATE
+void handleAutoOn() {
+  autoState = true;
+  server.send(200, "text/plain", "AUTO is ON");
+}
+
+void handleAutoOff() {
+  autoState = false;
+  server.send(200, "text/plain", "AUTO is OFF");
+}
+
+void handleLightOn() {
+  if (!autoState) {
+    lightState = true;
+    digitalWrite(LED_PIN_D2_LIGHT, HIGH);
+    server.send(200, "text/plain", "LED is ON");
+  } else {
+    server.send(400, "text/plain", "AUTO is ON");
+  }
+}
+
+void handleLightOff() {
+  if (!autoState) {
+    lightState = false;
+    digitalWrite(LED_PIN_D2_LIGHT, LOW);
+    server.send(200, "text/plain", "LED is OFF");
+  } else {
+    server.send(400, "text/plain", "AUTO is ON");
+  }
+}
+
+void handleNotFound() {
+  server.send(404, "text/plain", "Page not found!");
+}
+
+void handleDevice(float temperature) {
+  if (temperature > 40 && autoState) {
+    handleLightOn();
+  } else if (temperature < 40 && autoState) {
+    handleLightOff();
+  }
+}
+
+void handleMonitor() {
+  int soilMoistureValue = analogRead(SOIL_SENSOR_PIN);
+  float soilMoisturePercent = map(soilMoistureValue, 0, 1023, 0, 100);
+
+  float humidityAir = dht.readHumidity();
+  float temperature = dht.readTemperature();
+  if (isnan(humidityAir) || isnan(temperature)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+  server.send(200, "text/plain", String(humidityAir) + '-' + String(soilMoisturePercent) + '-' + String(temperature));
+  handleDevice(temperature);
+}
+
+void setupServer() {
+  // Connect Wifi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi...");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", handleRoot);
+
+   // STATE
+  server.on("/auto/on", handleAutoOn);
+  server.on("/auto/off", handleAutoOff);
+
+  // LIGHT
+  server.on("/light/on", handleLightOn);
+  server.on("/light/off", handleLightOff);
+
+  // SENSOR
+  server.on("/monitor", handleMonitor);
+
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+  Serial.println("Webserver started");
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+
+  pinMode(LED_PIN_D2_LIGHT, OUTPUT);
+  pinMode(LED_PIN_D3_FAN, OUTPUT);
+  pinMode(SOIL_SENSOR_PIN, INPUT);
+    
+  dht.begin();
+
+  // Off LED
+  digitalWrite(LED_PIN_D2_LIGHT, LOW);
+  digitalWrite(LED_PIN_D3_FAN, LOW);
+
+  setupServer();
+}
+
+void loop() {
+  server.handleClient();
+}
+
