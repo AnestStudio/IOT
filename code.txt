@@ -1,6 +1,5 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <Ticker.h>
 
 #include <DHT.h>
 #define SOIL_SENSOR_PIN A0
@@ -20,7 +19,6 @@ ESP8266WebServer server(80);
 const int LED_PIN = 0;
 bool ledState = false;
 bool blinkState = false;
-Ticker ticker;
 
 const char* html = R"html(
 <!DOCTYPE html>
@@ -225,7 +223,7 @@ const char* html = R"html(
     </div>
 
     <div class="panel">
-      <div class="info></div>
+      <div class="info"></div>
     </div>
   </div>
 
@@ -396,7 +394,6 @@ void handleRoot() {
 
 void handleLedOn() {
   blinkState = false;
-  ticker.detach();
   ledState = true;
   digitalWrite(LED_PIN, HIGH);
   server.send(200, "text/plain", "LED is ON");
@@ -404,7 +401,6 @@ void handleLedOn() {
 
 void handleLedOff() {
   blinkState = false;
-  ticker.detach();
   ledState = false;
   digitalWrite(LED_PIN, LOW);
   server.send(200, "text/plain", "LED is OFF");
@@ -421,13 +417,11 @@ void toggleLED() {
 
 void handleLedBlink() {
   blinkState = true;
-  ticker.attach(0.5, toggleLED);
   server.send(200, "text/plain", "LED is BLINKING");
 }
 
 void handleLedStop() {
   blinkState = false;
-  ticker.detach(); 
   digitalWrite(LED_PIN, LOW);
   server.send(200, "text/plain", "LED stopped BLINKING");
 }
