@@ -39,6 +39,22 @@ const char* html = R"html(
       font-style: normal;
       font-size: 14px;
     }
+
+    .table th {
+      background-color: #eee;
+    }
+
+    .table,
+    .table th,
+    .table td {
+      border: 1px solid #ccc;
+      border-collapse: collapse;
+      padding: 8px 4px;
+    }
+
+    .w-100 {
+      width: 100%;
+    }
     
     .d-flex {
       display: flex;
@@ -78,6 +94,7 @@ const char* html = R"html(
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       height: 32px;
       border-radius: 8px;
       border: none;
@@ -197,7 +214,7 @@ const char* html = R"html(
       font-size: 16px;
       text-decoration: none;
       display: inline-block;
-      padding: 8px;
+      padding: 8px 0;
       color: #000;
       font-weight: 700;
       border-radius: 8px;
@@ -342,18 +359,57 @@ const char* html = R"html(
 
     <div id="Tab2" class="tab-content">
       <h2>Setting</h2>
-      <h2>Set Temperature Threshold</h2>
-      <form id="tempForm">
-        <label for="minTemperature">Min Temperature:</label>
-        <input type="number" id="minTemperature" name="minTemperature" required>
-        <br>
-        <label for="maxTemperature">Max Temperature:</label>
-        <input type="number" id="maxTemperature" name="maxTemperature" required>
-        <br>
-        <label for="deviceName">Device Name:</label>
-        <input type="text" id="deviceName" name="deviceName" required>
-        <br>
-        <input type="submit" value="Set">
+      <form id="settingForm">
+        <h3 style="margin-bottom: 8px;">Set Temperature Threshold</h3>
+        <table style="width: 100%;">
+          <tr>
+            <td>Min Temperature:</td>
+            <td>
+              <input type="number" class="form-input" id="minTemperature" name="minTemperature" required> °C
+            </td>
+          </tr>
+          <tr>
+            <td>Max Temperature:</td>
+            <td>
+              <input type="number" class="form-input" id="maxTemperature" name="maxTemperature" required> °C
+            </td>
+          </tr>
+        </table>
+
+        <h3 style="margin-bottom: 8px;">Set Air Humidity Threshold</h3>
+        <table style="width: 100%;">
+          <tr>
+            <td>Min Air Humidity:</td>
+            <td>
+              <input type="number" class="form-input" id="minAirHumidity" name="minAirHumidity" required> %
+            </td>
+          </tr>
+          <tr>
+            <td>Max Air Humidity:</td>
+            <td>
+              <input type="number" class="form-input" id="maxAirHumidity" name="maxAirHumidity" required> %
+            </td>
+          </tr>
+        </table>
+
+        <h3 style="margin-bottom: 8px;">Set Soil Humidity Threshold</h3>
+        <table style="width: 100%;">
+          <tr>
+            <td>Min Soil Humidity:</td>
+            <td>
+              <input type="number" class="form-input" id="minSoilHumidity" name="minSoilHumidity" required> %
+            </td>
+          </tr>
+          <tr>
+            <td>Max Soil Humidity:</td>
+            <td>
+              <input type="number" class="form-input" id="maxSoilHumidity" name="maxSoilHumidity" required> %
+            </td>
+          </tr>
+        </table>
+        <p>
+          <input class="btn btn-danger" type="submit" value="Set" style="width: 100%; height: 40px;">
+        </p>
       </form>
     </div>
 
@@ -378,6 +434,58 @@ const char* html = R"html(
       </div>
       <div id="chartMonthReport" style="height: 280px"></div>
     </div>
+
+    <div id="Tab4" class="tab-content">
+      <h2>Report state</h2>
+
+      <div style="text-align: left; margin-bottom: 20px;">
+        <form id="deviceStateForm">
+          <label for="date">Select Date:</label>
+          <input class="form-input" type="date" id="device-state-input" name="device-state-input" required style="margin-right: 4px;">
+          <button class="btn btn-danger" type="submit">View</button>
+        </form>
+      </div>
+
+      <table class="table w-100">
+        <tr>
+          <th rowspan="2">#</th>
+          <th rowspan="2">DEVICE</th>
+          <th colspan="2">AUTO</th>
+          <th colspan="2">MANUAL</th>
+        </tr>
+        <tr>
+          <th>ON</th>
+          <th>OFF</th>
+          <th>ON</th>
+          <th>OFF</th>
+        </tr>
+        <tr>
+          <td style="text-align: center;">1</td>
+          <td style="text-align: left;">LIGHT</td>
+          <td style="text-align: center;"><span id="countAutoOnLightValue">0</span></td>
+          <td style="text-align: center;"><span id="countAutoOffLightValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOnLightValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOffLightValue">0</span></td>
+        </tr>
+        <tr>
+          <td style="text-align: center;">2</td>
+          <td style="text-align: left;">FAN</td>
+          <td style="text-align: center;"><span id="countAutoOnFanValue">0</span></td>
+          <td style="text-align: center;"><span id="countAutoOffFanValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOnFanValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOffFanValue">0</span></td>
+        </tr>
+        <tr>
+          <td style="text-align: center;">3</td>
+          <td style="text-align: left;">WATERING</td>
+          <td style="text-align: center;"><span id="countAutoOnWateringValue">0</span></td>
+          <td style="text-align: center;"><span id="countAutoOffWateringValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOnWateringValue">0</span></td>
+          <td style="text-align: center;"><span id="countManualOffWateringValue">0</span></td>
+        </tr>
+      </table>
+    </div>
+
   </div>
 
   <nav class="d-flex justify-content-between align-items-center">
@@ -389,6 +497,9 @@ const char* html = R"html(
     </div>
     <div>
       <a href="javascript:void(0)" class="tab-button" onclick="openTab(event, 'Tab3')">REPORT</a>
+    </div>
+    <div>
+      <a href="javascript:void(0)" class="tab-button" onclick="openTab(event, 'Tab4')">COUNT</a>
     </div>
     <div>
       <a href="javascript:void(0)" onclick="openNav()">MENU</a>
@@ -405,6 +516,8 @@ const char* html = R"html(
 
   <!-- VARIABLE -->
   <script type="text/javascript">
+    var URL = "http://localhost:8088";
+
     var lightState = false;
     var fanState = false;
     var waterState = false;
@@ -420,20 +533,76 @@ const char* html = R"html(
           document.getElementById('maxAirHumidityValue').innerText = this.responseText.split('-')[3];
           document.getElementById('maxSoilHumidityValue').innerText = this.responseText.split('-')[5];
 
-          myChart.setOption({
-            series: [{
-              data: gaugeData,
-              pointer: {
-                show: false
-              }
-            }]
-          });
+          setValueSetting(this.responseText);
         }
       };
       xhr.open('GET', '/init/setting/value', true);
       xhr.send();
     }
+
+    function setValueSetting(responseText) {
+      document.getElementById('minTemperature').value = responseText.split('-')[0];
+      document.getElementById('maxTemperature').value = responseText.split('-')[1];
+      document.getElementById('minAirHumidity').value = responseText.split('-')[2];
+      document.getElementById('maxAirHumidity').value = responseText.split('-')[3];
+      document.getElementById('minSoilHumidity').value = responseText.split('-')[4];
+      document.getElementById('maxSoilHumidity').value = responseText.split('-')[5];
+    }
+
     initDataSetting();
+  </script>
+
+  <!-- Get init data count -->
+  <script type="text/javascript">
+    document.getElementById('deviceStateForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const date = document.getElementById('device-state-input').value;
+      getCountsByDeviceId(date);
+    });
+
+    function getCountsByDeviceId(date) {
+      fetch(`${URL}/api/device/state/counts?date=${date}`)
+        .then(response => response.json())
+        .then(data => {
+          initCountsDeviceState();
+
+          document.getElementById('countAutoOnLightValue').innerText = data["1"] !== undefined ? data["1"].autoOn : 0;
+          document.getElementById('countAutoOffLightValue').innerText = data["1"] !== undefined ? data["1"].autoOff : 0;
+          document.getElementById('countManualOnLightValue').innerText = data["1"] !== undefined ? data["1"].manualOn : 0;
+          document.getElementById('countManualOffLightValue').innerText = data["1"] !== undefined ? data["1"].manualOff : 0;
+
+          document.getElementById('countAutoOnFanValue').innerText = data["2"] !== undefined ? data["2"].autoOn : 0;
+          document.getElementById('countAutoOffFanValue').innerText = data["2"] !== undefined ? data["2"].autoOff : 0;
+          document.getElementById('countManualOnFanValue').innerText = data["2"] !== undefined ? data["2"].manualOn : 0;
+          document.getElementById('countManualOffFanValue').innerText = data["2"] !== undefined ? data["2"].manualOff : 0;
+
+          document.getElementById('countAutoOnWateringValue').innerText = data["3"] !== undefined ? data["3"].autoOn : 0;
+          document.getElementById('countAutoOffWateringValue').innerText = data["3"] !== undefined ? data["3"].autoOff : 0;
+          document.getElementById('countManualOnWateringValue').innerText = data["3"] !== undefined ? data["3"].manualOn : 0;
+          document.getElementById('countManualOffWateringValue').innerText = data["3"] !== undefined ? data["3"].manualOff : 0;
+        })
+        .catch(error => {
+          console.error('Error fetching temperature data:', error);
+        });
+    }
+
+    function initCountsDeviceState() {
+      document.getElementById('countAutoOnLightValue').innerText = 0;
+      document.getElementById('countAutoOffLightValue').innerText = 0;
+      document.getElementById('countManualOnLightValue').innerText = 0;
+      document.getElementById('countManualOffLightValue').innerText = 0;
+
+      document.getElementById('countAutoOnFanValue').innerText = 0;
+      document.getElementById('countAutoOffFanValue').innerText = 0;
+      document.getElementById('countManualOnFanValue').innerText = 0;
+      document.getElementById('countManualOffFanValue').innerText = 0;
+
+      document.getElementById('countAutoOnWateringValue').innerText = 0;
+      document.getElementById('countAutoOffWateringValue').innerText = 0;
+      document.getElementById('countManualOnWateringValue').innerText = 0;
+      document.getElementById('countManualOffWateringValue').innerText = 0;
+    }
   </script>
 
   <!-- Set checkbox state - Func -->
@@ -638,6 +807,7 @@ const char* html = R"html(
     const c_month = ("0" + (today.getMonth() + 1)).slice(-2);
     const formattedDate = today.getFullYear() + "-" + c_month + "-" + c_day;
     document.getElementById('date-line-chart').value = formattedDate;
+    document.getElementById('device-state-input').value = formattedDate;
 
     document.getElementById('dateSensorForm').addEventListener('submit', function(event) {
       event.preventDefault();
@@ -648,7 +818,7 @@ const char* html = R"html(
     });
 
     function getDataSensor(day, month, year) {
-      fetch(`http://localhost:8088/api/temperatures/day?day=${day}&month=${month}&year=${year}`)
+      fetch(`${URL}/api/temperatures/day?day=${day}&month=${month}&year=${year}`)
         .then(response => response.json())
         .then(data => {
           if (JSON.stringify(data) === '{}') {
@@ -792,15 +962,23 @@ const char* html = R"html(
 
   <!-- SETTING -->
   <script type="text/javascript">
-    document.getElementById('tempForm').addEventListener('submit', function(event) {
+    document.getElementById('settingForm').addEventListener('submit', function(event) {
       event.preventDefault();
 
       const minTemperature = document.getElementById('minTemperature').value;
       const maxTemperature = document.getElementById('maxTemperature').value;
+      const minAirHumidity = document.getElementById('minAirHumidity').value;
+      const maxAirHumidity = document.getElementById('maxAirHumidity').value;
+      const minSoilHumidity = document.getElementById('minSoilHumidity').value;
+      const maxSoilHumidity = document.getElementById('maxSoilHumidity').value;
 
       const params = new URLSearchParams();
       params.append('minTemperatureThreshold', minTemperature);
       params.append('maxTemperatureThreshold', maxTemperature);
+      params.append('minAirHumidityThreshold', minAirHumidity);
+      params.append('maxAirHumidityThreshold', maxAirHumidity);
+      params.append('minSoilHumidityThreshold', minSoilHumidity);
+      params.append('maxSoilHumidityThreshold', maxSoilHumidity);
 
       fetch('/setTemperature', {
           method: 'POST',
@@ -841,7 +1019,7 @@ float minSoilHumidityThreshold = 50.0;
 float maxSoilHumidityThreshold = 70.0;
 
 // URL
-const char* serverUrl = "http://192.168.100.245:8088/api/device/status";
+const char* serverUrl = "http://192.168.100.245:8088/api/device/state/add";
 
 //
 long getCurrentTimestamp() {
@@ -933,14 +1111,14 @@ void toggleLight(bool action) {
 void handleFanOn() {
   fanState = true;
   digitalWrite(LED_PIN_D3_FAN, HIGH);
-  sendDeviceStatus("1", "FAN", true);
+  sendDeviceStatus("2", "FAN", true);
   server.send(200, "text/plain", "FAN is ON");
 }
 
 void handleFanOff() {
   fanState = false;
   digitalWrite(LED_PIN_D3_FAN, LOW);
-  sendDeviceStatus("1", "FAN", false);
+  sendDeviceStatus("2", "FAN", false);
   server.send(200, "text/plain", "FAN is OFF");
 }
 
@@ -960,14 +1138,14 @@ void toggleFan(bool action) {
 void handleWaterOn() {
   waterState = true;
   digitalWrite(LED_PIN_D1_WATER, HIGH);
-  sendDeviceStatus("1", "WATER", true);
+  sendDeviceStatus("3", "WATER", true);
   server.send(200, "text/plain", "WATER is ON");
 }
 
 void handleWaterOff() {
   waterState = false;
   digitalWrite(LED_PIN_D1_WATER, LOW);
-  sendDeviceStatus("1", "WATER", false);
+  sendDeviceStatus("3", "WATER", false);
   server.send(200, "text/plain", "WATER is OFF");
 }
 
@@ -1017,14 +1195,19 @@ void handleDeviceWater(float soilHumidity) {
 }
 
 // SETTING ------------------------------------------------------------------------------------------------------------------------------------------------------
-void handleSetTemperature() {
-  if (server.hasArg("minTemperatureThreshold") && server.hasArg("maxTemperatureThreshold")) {
+void handleSetThreshold() {
+  if (server.hasArg("minTemperatureThreshold") && server.hasArg("maxTemperatureThreshold") 
+      && server.hasArg("minAirHumidityThreshold") && server.hasArg("maxAirHumidityThreshold") 
+      && server.hasArg("minSoilHumidityThreshold") && server.hasArg("maxSoilHumidityThreshold")
+  ) {
     minTemperatureThreshold = server.arg("minTemperatureThreshold").toFloat();
     maxTemperatureThreshold = server.arg("maxTemperatureThreshold").toFloat();
+    minAirHumidityThreshold = server.arg("minAirHumidityThreshold").toFloat();
+    maxAirHumidityThreshold = server.arg("maxAirHumidityThreshold").toFloat();
+    minSoilHumidityThreshold = server.arg("minSoilHumidityThreshold").toFloat();
+    maxSoilHumidityThreshold = server.arg("maxSoilHumidityThreshold").toFloat();
 
-    String response = "Settings updated successfully!\n";
-
-    server.send(200, "text/plain", response);
+    server.send(200, "text/plain", "Settings updated successfully!");
   } else {
     server.send(400, "text/plain", "Invalid request");
   }
@@ -1107,7 +1290,7 @@ void setupServer() {
   server.on("/init/setting/value", getInitSettingValue);
 
   // SETTING ------------------------------------------------------
-  server.on("/setTemperature", HTTP_POST, handleSetTemperature);
+  server.on("/setTemperature", HTTP_POST, handleSetThreshold);
 
   // ERROR --------------------------------------------------------
   server.onNotFound(handleNotFound);
