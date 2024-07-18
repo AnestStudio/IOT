@@ -1,5 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPClient.h>
+#include <time.h>
 
 #include <DHT.h>
 #define SOIL_SENSOR_PIN A0
@@ -15,18 +17,10 @@ const char* password = "88888888";
 // Webserver, port 80
 ESP8266WebServer server(80);
 
-// LED
-const int LED_PIN_D3_FAN = 0;
-const int LED_PIN_D2_LIGHT = 4;
-
-// State
-bool autoState = true;
-bool lightState = false;
-bool fanState = false;
-bool waterState = false;
+WiFiClient wifiClient;
 
 const char* html = R"html(
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" style="height: 100%">
 
 <head>
@@ -177,7 +171,7 @@ const char* html = R"html(
     }
     
     .auto-info {
-      padding: 12px 16px;
+      padding: 10px 12px;
       margin-top: 16px;
       border-radius: 20px;
       background-color: #d5e6de;
@@ -284,7 +278,7 @@ const char* html = R"html(
         <div class="btn-switch">
           <div class="d-flex justify-content-between">
             <div class="switch">
-              <input type="checkbox" id="lightCheckbox" onchange='toggleLight(this)'>
+              <input type="checkbox" id="lightCheckbox" onchange='toggleLight(this)' >
               <label for="lightCheckbox" class="slider"></label>
             </div>
             <div class="icon">
@@ -329,12 +323,17 @@ const char* html = R"html(
             <td>18h - 04h</td>
           </tr>
           <tr>
-            <td>FAN ON</td>
-            <td>Temp &gt; 30°C</td>
+            <td style="vertical-align: top;">FAN ON</td>
+            <td>
+              <p style="margin-top: 0; margin-bottom: 4px;">Temperature &nbsp;&gt; <span id="maxTemperatureValue">0</span>°C</p>
+              <p style="margin-top: 0; margin-bottom: 4px;">Air Humidity &nbsp;&gt; <span id="maxAirHumidityValue">0</span>%</p>
+            </td>
           </tr>
           <tr>
-            <td style="padding-right: 8px;">WATERING ON</td>
-            <td>Temp &gt; 30°C OR Humidity &lt; 30%</td>
+            <td style="vertical-align: top; padding-right: 8px;">WATERING ON</td>
+            <td>
+              <p style="margin-top: 0; margin-bottom: 0;">Soil Humidity &gt; <span id="maxSoilHumidityValue">0</span>%</p>
+            </td>
           </tr>
         </table>
       </div>
@@ -343,7 +342,19 @@ const char* html = R"html(
 
     <div id="Tab2" class="tab-content">
       <h2>Setting</h2>
-      <p>Content for Tab 2.</p>
+      <h2>Set Temperature Threshold</h2>
+      <form id="tempForm">
+        <label for="minTemperature">Min Temperature:</label>
+        <input type="number" id="minTemperature" name="minTemperature" required>
+        <br>
+        <label for="maxTemperature">Max Temperature:</label>
+        <input type="number" id="maxTemperature" name="maxTemperature" required>
+        <br>
+        <label for="deviceName">Device Name:</label>
+        <input type="text" id="deviceName" name="deviceName" required>
+        <br>
+        <input type="submit" value="Set">
+      </form>
     </div>
 
     <div id="Tab3" class="tab-content">
@@ -392,7 +403,52 @@ const char* html = R"html(
     <a href="#">Contact</a>
   </div>
 
-  <!-- Open/hide nav -->
+  <!-- VARIABLE -->
+  <script type="text/javascript">
+    var lightState = false;
+    var fanState = false;
+    var waterState = false;
+  </script>
+
+  <!-- Get init data setting -->
+  <script type="text/javascript">
+    function initDataSetting() {
+      const xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('maxTemperatureValue').innerText = this.responseText.split('-')[1];
+          document.getElementById('maxAirHumidityValue').innerText = this.responseText.split('-')[3];
+          document.getElementById('maxSoilHumidityValue').innerText = this.responseText.split('-')[5];
+
+          myChart.setOption({
+            series: [{
+              data: gaugeData,
+              pointer: {
+                show: false
+              }
+            }]
+          });
+        }
+      };
+      xhr.open('GET', '/init/setting/value', true);
+      xhr.send();
+    }
+    initDataSetting();
+  </script>
+
+  <!-- Set checkbox state - Func -->
+  <script type="text/javascript">
+    function setCheckboxStatus(checkboxId, status) {
+      const checkbox = document.getElementById(checkboxId);
+      if (status === '1') {
+        checkbox.checked = true;
+      } else {
+        checkbox.checked = false;
+      }
+    }
+  </script>
+
+  <!-- Open/hide nav - Func -->
   <script type="text/javascript">
     function openNav() {
       document.getElementById("mySidenav").style.width = "250px";
@@ -403,7 +459,7 @@ const char* html = R"html(
     }
   </script>
 
-  <!-- Tab -->
+  <!-- Tab - Func -->
   <script type="text/javascript">
     function openTab(evt, tabName) {
 
@@ -438,7 +494,7 @@ const char* html = R"html(
     });
 
     const gaugeData = [{
-      value: 20,
+      value: 0,
       name: 'Air humidity',
       title: {
         offsetCenter: ['0%', '-43%']
@@ -454,7 +510,7 @@ const char* html = R"html(
         color: '#0d6efd'
       }
     }, {
-      value: 40,
+      value: 0,
       name: 'Soil humidity',
       title: {
         offsetCenter: ['0%', '-10%']
@@ -470,7 +526,7 @@ const char* html = R"html(
         color: '#198754'
       }
     }, {
-      value: 60,
+      value: 0,
       name: 'Temperature',
       title: {
         offsetCenter: ['0%', '23%']
@@ -540,13 +596,20 @@ const char* html = R"html(
     };
 
     setInterval(function() {
-      let r1, r2, r3;
-      var xhr = new XMLHttpRequest();
+      const xhr = new XMLHttpRequest();
       xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
           gaugeData[0].value = this.responseText.split('-')[0];
           gaugeData[1].value = this.responseText.split('-')[1];
           gaugeData[2].value = this.responseText.split('-')[2];
+
+          lightState = this.responseText.split('-')[3];
+          fanState = this.responseText.split('-')[4];
+          waterState = this.responseText.split('-')[5];
+
+          setCheckboxStatus('lightCheckbox', lightState);
+          setCheckboxStatus('fanCheckbox', fanState);
+          setCheckboxStatus('wateringCheckbox', waterState);
 
           myChart.setOption({
             series: [{
@@ -684,23 +747,24 @@ const char* html = R"html(
     });
   </script>
 
+  <!-- Device ON/OFF - Func -->
   <script type="text/javascript">
-    function toggleLight(element) {
-      const xhr = new XMLHttpRequest();
-      if (element.checked) {
-        xhr.open('GET', '/light/on', true);
-      } else {
-        xhr.open('GET', '/light/off', true);
-      }
-      xhr.send();
-    }
-
     function toggleAutoState(element) {
       const xhr = new XMLHttpRequest();
       if (element.checked) {
         xhr.open('GET', '/auto/on', true);
       } else {
         xhr.open('GET', '/auto/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleLight(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/light/on', true);
+      } else {
+        xhr.open('GET', '/light/off', true);
       }
       xhr.send();
     }
@@ -725,16 +789,109 @@ const char* html = R"html(
       xhr.send();
     }
   </script>
+
+  <!-- SETTING -->
+  <script type="text/javascript">
+    document.getElementById('tempForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const minTemperature = document.getElementById('minTemperature').value;
+      const maxTemperature = document.getElementById('maxTemperature').value;
+
+      const params = new URLSearchParams();
+      params.append('minTemperatureThreshold', minTemperature);
+      params.append('maxTemperatureThreshold', maxTemperature);
+
+      fetch('/setTemperature', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        })
+        .then(response => response.text())
+        .then(data => {
+          alert(data);
+          initDataSetting();
+        });
+    });
+  </script>
 </body>
 
 </html>
 )html";
 
+// LED
+const int LED_PIN_D2_LIGHT = 4;
+const int LED_PIN_D3_FAN = 0;
+const int LED_PIN_D1_WATER = 5;
+
+// State
+bool autoState = true;
+bool lightState = false;
+bool fanState = false;
+bool waterState = false;
+
+// Value
+float minTemperatureThreshold = 25.0;
+float maxTemperatureThreshold = 30.0;
+float minAirHumidityThreshold = 70.0;
+float maxAirHumidityThreshold = 80.0;
+float minSoilHumidityThreshold = 50.0;
+float maxSoilHumidityThreshold = 70.0;
+
+// URL
+const char* serverUrl = "http://192.168.100.245:8088/api/device/status";
+
+//
+long getCurrentTimestamp() {
+  time_t now = time(nullptr);
+  return now;
+}
+
+void sendDeviceStatus(const String& deviceId, const String& deviceName, bool state) {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(wifiClient, serverUrl);
+
+    // Tạo JSON payload
+    String jsonPayload = "{";
+    jsonPayload += "\"deviceId\":\"" + deviceId + "\",";
+    jsonPayload += "\"deviceName\":\"" + deviceName + "\",";
+    jsonPayload += "\"state\":" + String(state ? "true" : "false") + ",";
+    jsonPayload += "\"type\":" + String(autoState ? "true" : "false") + ",";
+    jsonPayload += "\"datetime\":" + String(getCurrentTimestamp());
+    jsonPayload += "}";
+
+    http.addHeader("Content-Type", "application/json");
+
+    Serial.print("Sending POST request to ");
+    Serial.println(serverUrl);
+    Serial.print("Payload: ");
+    Serial.println(jsonPayload);
+
+    int httpResponseCode = http.POST(jsonPayload);
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.println(httpResponseCode);
+      Serial.println(response);
+    } else {
+      Serial.print("Error on sending POST: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("WiFi not connected");
+  }
+}
+
 void handleRoot() {
   server.send(200, "text/html", html);
 }
 
-// STATE
+// STATE --------------------------------------------------------------------------------------------------------------------------------------------------------
 void handleAutoOn() {
   autoState = true;
   server.send(200, "text/plain", "AUTO is ON");
@@ -745,38 +902,139 @@ void handleAutoOff() {
   server.send(200, "text/plain", "AUTO is OFF");
 }
 
+// LIGHT --------------------------------------------------------------------------------------------------------------------------------------------------------
 void handleLightOn() {
-  if (!autoState) {
-    lightState = true;
-    digitalWrite(LED_PIN_D2_LIGHT, HIGH);
-    server.send(200, "text/plain", "LED is ON");
-  } else {
-    server.send(400, "text/plain", "AUTO is ON");
-  }
+  lightState = true;
+  digitalWrite(LED_PIN_D2_LIGHT, HIGH);
+  sendDeviceStatus("1", "LIGHT", true);
+  server.send(200, "text/plain", "LIGHT is ON");
 }
 
 void handleLightOff() {
+  lightState = false;
+  digitalWrite(LED_PIN_D2_LIGHT, LOW);
+  sendDeviceStatus("1", "LIGHT", false);
+  server.send(200, "text/plain", "LIGHT is OFF");
+}
+
+void toggleLight(bool action) {
   if (!autoState) {
-    lightState = false;
-    digitalWrite(LED_PIN_D2_LIGHT, LOW);
-    server.send(200, "text/plain", "LED is OFF");
+    if (action) {
+      handleLightOn();
+    } else {
+      handleLightOff();
+    }
   } else {
     server.send(400, "text/plain", "AUTO is ON");
   }
 }
 
+// FAN ----------------------------------------------------------------------------------------------------------------------------------------------------------
+void handleFanOn() {
+  fanState = true;
+  digitalWrite(LED_PIN_D3_FAN, HIGH);
+  sendDeviceStatus("1", "FAN", true);
+  server.send(200, "text/plain", "FAN is ON");
+}
+
+void handleFanOff() {
+  fanState = false;
+  digitalWrite(LED_PIN_D3_FAN, LOW);
+  sendDeviceStatus("1", "FAN", false);
+  server.send(200, "text/plain", "FAN is OFF");
+}
+
+void toggleFan(bool action) {
+  if (!autoState) {
+    if (action) {
+      handleFanOn();
+    } else {
+      handleFanOff();
+    }
+  } else {
+    server.send(400, "text/plain", "AUTO is ON");
+  }
+}
+
+// WATER --------------------------------------------------------------------------------------------------------------------------------------------------------
+void handleWaterOn() {
+  waterState = true;
+  digitalWrite(LED_PIN_D1_WATER, HIGH);
+  sendDeviceStatus("1", "WATER", true);
+  server.send(200, "text/plain", "WATER is ON");
+}
+
+void handleWaterOff() {
+  waterState = false;
+  digitalWrite(LED_PIN_D1_WATER, LOW);
+  sendDeviceStatus("1", "WATER", false);
+  server.send(200, "text/plain", "WATER is OFF");
+}
+
+void toggleWater(bool action) {
+  if (!autoState) {
+    if (action) {
+      handleWaterOn();
+    } else {
+      handleWaterOff();
+    }
+  } else {
+    server.send(400, "text/plain", "AUTO is ON");
+  }
+}
+
+// ERROR --------------------------------------------------------------------------------------------------------------------------------------------------------
 void handleNotFound() {
   server.send(404, "text/plain", "Page not found!");
 }
 
-void handleDevice(float temperature) {
-  if (temperature > 40 && autoState) {
-    handleLightOn();
-  } else if (temperature < 40 && autoState) {
-    handleLightOff();
+// DEVICE ACTION ------------------------------------------------------------------------------------------------------------------------------------------------
+void handleDeviceFan(float temperature, float airHumidity) {
+  Serial.println("HandleDeviceFan   | Temperature : " + String(temperature) + " | TemperatureThreshold : " + String(minTemperatureThreshold) + " - " + String(maxTemperatureThreshold) + " | AutoState: " + String(autoState));
+  Serial.println("HandleDeviceFan   | AirHumidity : " + String(airHumidity) + " | AirHumidityThreshold : " + String(minAirHumidityThreshold) + " - " + String(maxAirHumidityThreshold) + " | AutoState: " + String(autoState));
+  
+  if (((temperature > maxTemperatureThreshold) || (airHumidity > maxAirHumidityThreshold)) && autoState && !fanState) {
+    Serial.println("FAN ON");
+    handleFanOn();
+  }
+  if (((temperature < maxTemperatureThreshold) && (airHumidity < maxAirHumidityThreshold)) && autoState && fanState) {
+    Serial.println("FAN OFF");
+    handleFanOff();
   }
 }
 
+void handleDeviceWater(float soilHumidity) {
+  Serial.println("HandleDeviceWater | SoilHumidity: " + String(soilHumidity) + " | SoilHumidityThreshold: " + String(minSoilHumidityThreshold) + " - " + String(maxSoilHumidityThreshold) + " | AutoState: " + String(autoState));
+  
+  if (soilHumidity > maxSoilHumidityThreshold && autoState && !waterState) {
+    Serial.println("WATER ON");
+    handleWaterOn();
+  } 
+  if (soilHumidity < minSoilHumidityThreshold && autoState && waterState) {
+    Serial.println("WATER OFF");
+    handleWaterOff();
+  }
+}
+
+// SETTING ------------------------------------------------------------------------------------------------------------------------------------------------------
+void handleSetTemperature() {
+  if (server.hasArg("minTemperatureThreshold") && server.hasArg("maxTemperatureThreshold")) {
+    minTemperatureThreshold = server.arg("minTemperatureThreshold").toFloat();
+    maxTemperatureThreshold = server.arg("maxTemperatureThreshold").toFloat();
+
+    String response = "Settings updated successfully!\n";
+
+    server.send(200, "text/plain", response);
+  } else {
+    server.send(400, "text/plain", "Invalid request");
+  }
+}
+
+void getInitSettingValue() {
+  server.send(200, "text/plain", String(minTemperatureThreshold) + '-' + String(maxTemperatureThreshold) + '-' + String(minAirHumidityThreshold) + '-' + String(maxAirHumidityThreshold) + '-' + String(minSoilHumidityThreshold) + '-' + String(maxSoilHumidityThreshold));
+}
+
+// GET SENSOR DATA ----------------------------------------------------------------------------------------------------------------------------------------------
 void handleMonitor() {
   int soilMoistureValue = analogRead(SOIL_SENSOR_PIN);
   float soilMoisturePercent = map(soilMoistureValue, 0, 1023, 0, 100);
@@ -787,16 +1045,18 @@ void handleMonitor() {
     Serial.println("Failed to read from DHT sensor!");
     return;
   }
-  server.send(200, "text/plain", String(humidityAir) + '-' + String(soilMoisturePercent) + '-' + String(temperature));
-  handleDevice(temperature);
+  server.send(200, "text/plain", String(humidityAir) + '-' + String(soilMoisturePercent) + '-' + String(temperature) + '-' + String(lightState) + '-' + String(fanState) + '-' + String(waterState));
+  handleDeviceFan(temperature, humidityAir);
+  handleDeviceWater(soilMoisturePercent);
 }
 
+// SETUP SERVER -------------------------------------------------------------------------------------------------------------------------------------------------
 void setupServer() {
   // Connect Wifi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi...");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    delay(1000);
     Serial.print(".");
   }
   Serial.println("");
@@ -804,19 +1064,52 @@ void setupServer() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
+  // Đồng bộ thời gian với server NTP
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  while (!time(nullptr)) {
+    delay(1000);
+    Serial.println("Waiting for time sync...");
+  }
+  Serial.println("Time synchronized");
+
   server.on("/", handleRoot);
 
-   // STATE
+   // STATE ------------------------------------------------------
   server.on("/auto/on", handleAutoOn);
   server.on("/auto/off", handleAutoOff);
 
-  // LIGHT
-  server.on("/light/on", handleLightOn);
-  server.on("/light/off", handleLightOff);
+  // LIGHT -------------------------------------------------------
+  server.on("/light/on", []() {
+    toggleLight(true);
+  });
+  server.on("/light/off", []() {
+    toggleLight(false);
+  });
 
-  // SENSOR
+  // FAN ---------------------------------------------------------
+  server.on("/fan/on", []() {
+    toggleFan(true);
+  });
+  server.on("/fan/off", []() {
+    toggleFan(false);
+  });
+
+  // WATER --------------------------------------------------------
+  server.on("/water/on", []() {
+    toggleWater(true);
+  });
+  server.on("/water/off", []() {
+    toggleWater(false);
+  });
+
+  // SENSOR -------------------------------------------------------
   server.on("/monitor", handleMonitor);
+  server.on("/init/setting/value", getInitSettingValue);
 
+  // SETTING ------------------------------------------------------
+  server.on("/setTemperature", HTTP_POST, handleSetTemperature);
+
+  // ERROR --------------------------------------------------------
   server.onNotFound(handleNotFound);
 
   server.begin();
@@ -829,6 +1122,7 @@ void setup() {
 
   pinMode(LED_PIN_D2_LIGHT, OUTPUT);
   pinMode(LED_PIN_D3_FAN, OUTPUT);
+  pinMode(LED_PIN_D1_WATER, OUTPUT);
   pinMode(SOIL_SENSOR_PIN, INPUT);
     
   dht.begin();
@@ -836,6 +1130,7 @@ void setup() {
   // Off LED
   digitalWrite(LED_PIN_D2_LIGHT, LOW);
   digitalWrite(LED_PIN_D3_FAN, LOW);
+  digitalWrite(LED_PIN_D1_WATER, LOW);
 
   setupServer();
 }

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sensors Dashboard</title>
+  <title>Sensors HTML</title>
   <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
@@ -149,7 +149,7 @@
     }
     
     .auto-info {
-      padding: 12px 16px;
+      padding: 10px 12px;
       margin-top: 16px;
       border-radius: 20px;
       background-color: #d5e6de;
@@ -301,20 +301,38 @@
             <td>18h - 04h</td>
           </tr>
           <tr>
-            <td>FAN ON</td>
-            <td>Temp &gt; 30°C</td>
+            <td style="vertical-align: top;">FAN ON</td>
+            <td>
+              <p style="margin-top: 0; margin-bottom: 4px;">Temperature &gt; <span id="maxTemperatureValue">0</span>°C</p>
+              <p style="margin-top: 0; margin-bottom: 4px;">Air Humidity &gt; <span id="maxAirHumidityValue">0</span>%</p>
+            </td>
           </tr>
           <tr>
-            <td style="padding-right: 8px;">WATERING ON</td>
-            <td>Temp &gt; 30°C OR Humidity &lt; 30%</td>
+            <td style="vertical-align: top; padding-right: 8px;">WATERING ON</td>
+            <td>
+              <p style="margin-top: 0; margin-bottom: 0;">Soil Humidity &gt; <span id="maxSoilHumidityValue">0</span>%</p>
+            </td>
           </tr>
         </table>
       </div>
+
     </div>
 
     <div id="Tab2" class="tab-content">
       <h2>Setting</h2>
-      <p>Content for Tab 2.</p>
+      <h2>Set Temperature Threshold</h2>
+      <form id="tempForm">
+        <label for="minTemperature">Min Temperature:</label>
+        <input type="number" id="minTemperature" name="minTemperature" required>
+        <br>
+        <label for="maxTemperature">Max Temperature:</label>
+        <input type="number" id="maxTemperature" name="maxTemperature" required>
+        <br>
+        <label for="deviceName">Device Name:</label>
+        <input type="text" id="deviceName" name="deviceName" required>
+        <br>
+        <input type="submit" value="Set">
+      </form>
     </div>
 
     <div id="Tab3" class="tab-content">
@@ -363,7 +381,51 @@
     <a href="#">Contact</a>
   </div>
 
-  <!-- Open/hide nav -->
+  <!-- VARIABLE -->
+  <script type="text/javascript">
+    var lightState = false;
+    var fanState = false;
+    var waterState = false;
+  </script>
+
+  <script type="text/javascript">
+    function initDataSetting() {
+      const xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+          document.getElementById('maxTemperatureValue').innerText = this.responseText.split('-')[1];
+          document.getElementById('maxAirHumidityValue').innerText = this.responseText.split('-')[3];
+          document.getElementById('maxSoilHumidityValue').innerText = this.responseText.split('-')[5];
+
+          myChart.setOption({
+            series: [{
+              data: gaugeData,
+              pointer: {
+                show: false
+              }
+            }]
+          });
+        }
+      };
+      xhr.open('GET', '/init/setting/value', true);
+      xhr.send();
+    }
+    initDataSetting();
+  </script>
+
+  <!-- Set checkbox state - Func -->
+  <script type="text/javascript">
+    function setCheckboxStatus(checkboxId, status) {
+      const checkbox = document.getElementById(checkboxId);
+      if (status === '1') {
+        checkbox.checked = true;
+      } else {
+        checkbox.checked = false;
+      }
+    }
+  </script>
+
+  <!-- Open/hide nav - Func -->
   <script type="text/javascript">
     function openNav() {
       document.getElementById("mySidenav").style.width = "250px";
@@ -374,7 +436,7 @@
     }
   </script>
 
-  <!-- Tab -->
+  <!-- Tab - Func -->
   <script type="text/javascript">
     function openTab(evt, tabName) {
 
@@ -409,7 +471,7 @@
     });
 
     const gaugeData = [{
-      value: 20,
+      value: 0,
       name: 'Air humidity',
       title: {
         offsetCenter: ['0%', '-43%']
@@ -425,7 +487,7 @@
         color: '#0d6efd'
       }
     }, {
-      value: 40,
+      value: 0,
       name: 'Soil humidity',
       title: {
         offsetCenter: ['0%', '-10%']
@@ -441,7 +503,7 @@
         color: '#198754'
       }
     }, {
-      value: 60,
+      value: 0,
       name: 'Temperature',
       title: {
         offsetCenter: ['0%', '23%']
@@ -511,13 +573,20 @@
     };
 
     setInterval(function() {
-      let r1, r2, r3;
-      var xhr = new XMLHttpRequest();
+      const xhr = new XMLHttpRequest();
       xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
           gaugeData[0].value = this.responseText.split('-')[0];
           gaugeData[1].value = this.responseText.split('-')[1];
           gaugeData[2].value = this.responseText.split('-')[2];
+
+          lightState = this.responseText.split('-')[3];
+          fanState = this.responseText.split('-')[4];
+          waterState = this.responseText.split('-')[5];
+
+          setCheckboxStatus('lightCheckbox', lightState);
+          setCheckboxStatus('fanCheckbox', fanState);
+          setCheckboxStatus('wateringCheckbox', waterState);
 
           myChart.setOption({
             series: [{
@@ -655,6 +724,74 @@
     });
   </script>
 
+  <!-- Device ON/OFF - Func -->
+  <script type="text/javascript">
+    function toggleAutoState(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/auto/on', true);
+      } else {
+        xhr.open('GET', '/auto/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleLight(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/light/on', true);
+      } else {
+        xhr.open('GET', '/light/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleFan(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/fan/on', true);
+      } else {
+        xhr.open('GET', '/fan/off', true);
+      }
+      xhr.send();
+    }
+
+    function toggleWater(element) {
+      const xhr = new XMLHttpRequest();
+      if (element.checked) {
+        xhr.open('GET', '/water/on', true);
+      } else {
+        xhr.open('GET', '/water/off', true);
+      }
+      xhr.send();
+    }
+  </script>
+
+  <!-- SETTING -->
+  <script type="text/javascript">
+    document.getElementById('tempForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const minTemperature = document.getElementById('minTemperature').value;
+      const maxTemperature = document.getElementById('maxTemperature').value;
+
+      const params = new URLSearchParams();
+      params.append('minTemperatureThreshold', minTemperature);
+      params.append('maxTemperatureThreshold', maxTemperature);
+
+      fetch('/setTemperature', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        })
+        .then(response => response.text())
+        .then(data => {
+          alert(data);
+        });
+    });
+  </script>
 </body>
 
 </html>
