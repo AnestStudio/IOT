@@ -247,7 +247,7 @@ const char* html = R"html(
     }
     
     .sidenav a:hover {
-      color: #f1f1f1;
+      color: #cc4749;
     }
     
     .sidenav .closebtn {
@@ -337,7 +337,7 @@ const char* html = R"html(
         <table>
           <tr>
             <td>LIGHT ON</td>
-            <td>18h - 04h</td>
+            <td><span id="timeLightAutoValue"></span></td>
           </tr>
           <tr>
             <td style="vertical-align: top;">FAN ON</td>
@@ -407,6 +407,27 @@ const char* html = R"html(
             </td>
           </tr>
         </table>
+
+        <h3 style="margin-bottom: 8px;">Set Timer to turn on and off lights</h3>
+        <table style="width: 100%;">
+          <tr>
+            <td>Turn ON:</td>
+            <td>
+              <input type="number" class="form-input" id="l_hour_on" name="l_hour_on" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_minute_on" name="l_minute_on" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_second_on" name="l_second_on" style="width: 60px;" required>
+            </td>
+          </tr>
+          <tr>
+            <td>Turn OFF:</td>
+            <td>
+              <input type="number" class="form-input" id="l_hour_off" name="l_hour_off" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_minute_off" name="l_minute_off" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_second_off" name="l_second_off" style="width: 60px;" required>
+            </td>
+          </tr>
+        </table>
+
         <p>
           <input class="btn btn-danger" type="submit" value="Set" style="width: 100%; height: 40px;">
         </p>
@@ -424,15 +445,6 @@ const char* html = R"html(
         </form>
       </div>
       <div id="chartReport" style="height: 280px"></div>
-
-      <div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">
-        <form id="monthSensorForm">
-          <label for="month">Select Month:</label>
-          <input class="form-input" type="month" id="month-line-chart" name="month-line-chart" required style="margin-right: 4px;">
-          <button class="btn btn-danger" type="submit">View</button>
-        </form>
-      </div>
-      <div id="chartMonthReport" style="height: 280px"></div>
     </div>
 
     <div id="Tab4" class="tab-content">
@@ -508,19 +520,26 @@ const char* html = R"html(
 
   <div id="mySidenav" class="sidenav">
     <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
-    <a href="#">About</a>
-    <a href="#">Services</a>
-    <a href="#">Clients</a>
-    <a href="#">Contact</a>
+    <a href="javascript:void(0)" onclick="openTab(event, 'Tab1')">HOME</a>
+    <a href="javascript:void(0)" onclick="openTab(event, 'Tab2')">SETTING</a>
+    <a href="javascript:void(0)" onclick="openTab(event, 'Tab3')">REPORT</a>
+    <a href="javascript:void(0)" onclick="openTab(event, 'Tab4')">COUNT</a>
   </div>
 
   <!-- VARIABLE -->
   <script type="text/javascript">
-    var URL = "http://localhost:8088";
+    var URL = "http://188.166.210.151:8088";
 
     var lightState = false;
     var fanState = false;
     var waterState = false;
+
+    var l_hour_on = 18;
+    var l_minute_on = 0;
+    var l_second_on = 0;
+    var l_hour_off = 5;
+    var l_minute_off = 0;
+    var l_second_off = 0;
   </script>
 
   <!-- Get init data setting -->
@@ -549,6 +568,18 @@ const char* html = R"html(
       document.getElementById('maxSoilHumidity').value = responseText.split('-')[5];
     }
 
+    function setTimeValueSetting() {
+      document.getElementById('l_hour_on').value = l_hour_on;
+      document.getElementById('l_minute_on').value = l_minute_on;
+      document.getElementById('l_second_on').value = l_second_on;
+      document.getElementById('l_hour_off').value = l_hour_off;
+      document.getElementById('l_minute_off').value = l_minute_off;
+      document.getElementById('l_second_off').value = l_second_off;
+
+      document.getElementById('timeLightAutoValue').innerText = l_hour_on + ':' + l_minute_on + ':' + l_second_on + ' − ' + l_hour_off + ':' + l_minute_off + ':' + l_second_off;
+    }
+
+    setTimeValueSetting();
     initDataSetting();
   </script>
 
@@ -917,6 +948,42 @@ const char* html = R"html(
     });
   </script>
 
+  <!-- LIGHT ON/OFF -->
+  <script type="text/javascript">
+    function toggleLightDaily(element) {
+      const xhr = new XMLHttpRequest();
+      if (element) {
+        xhr.open('GET', '/light/auto/on', true);
+      } else {
+        xhr.open('GET', '/light/auto/off', true);
+      }
+      xhr.send();
+    }
+
+    function getTimeUntilNextTime(hour, minute, second) {
+      const now = new Date();
+      const nextTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, second, 0);
+
+      if (now > nextTime) {
+        nextTime.setDate(nextTime.getDate() + 1);
+      }
+      return nextTime - now;
+    }
+
+    function setupDailyTurnLight(hour, minute, second, isOn) {
+      const timeUntilNextTime = getTimeUntilNextTime(hour, minute, second);
+      console.log(timeUntilNextTime);
+
+      setTimeout(() => {
+        toggleLightDaily(isOn);
+        setInterval(toggleLightDaily(isOn), 24 * 60 * 60 * 1000); // 24h
+      }, timeUntilNextTime);
+    }
+
+    setupDailyTurnLight(l_hour_on, l_minute_on, l_second_on, true);
+    setupDailyTurnLight(l_hour_off, l_minute_off, l_second_off, false);
+  </script>
+
   <!-- Device ON/OFF - Func -->
   <script type="text/javascript">
     function toggleAutoState(element) {
@@ -992,6 +1059,16 @@ const char* html = R"html(
           alert(data);
           initDataSetting();
         });
+
+      l_hour_on = document.getElementById('l_hour_on').value;
+      l_minute_on = document.getElementById('l_minute_on').value;
+      l_second_on = document.getElementById('l_second_on').value;
+      l_hour_off = document.getElementById('l_hour_off').value;
+      l_minute_off = document.getElementById('l_minute_off').value;
+      l_second_off = document.getElementById('l_second_off').value;
+      setTimeValueSetting();
+      setupDailyTurnLight(l_hour_on, l_minute_on, l_second_on, true);
+      setupDailyTurnLight(l_hour_off, l_minute_off, l_second_off, false);
     });
   </script>
 </body>
@@ -1267,6 +1344,13 @@ void setupServer() {
   });
   server.on("/light/off", []() {
     toggleLight(false);
+  });
+
+  server.on("/light/auto/on", []() {
+    handleLightOn();
+  });
+  server.on("/light/auto/off", []() {
+    handleLightOff();
   });
 
   // FAN ---------------------------------------------------------

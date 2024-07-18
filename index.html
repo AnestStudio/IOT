@@ -386,6 +386,26 @@
             </td>
           </tr>
         </table>
+
+        <h3 style="margin-bottom: 8px;">Set Timer to turn on and off lights</h3>
+        <table style="width: 100%;">
+          <tr>
+            <td>Turn ON:</td>
+            <td>
+              <input type="number" class="form-input" id="l_hour_on" name="l_hour_on" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_minute_on" name="l_minute_on" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_second_on" name="l_second_on" style="width: 60px;" required>
+            </td>
+          </tr>
+          <tr>
+            <td>Turn OFF:</td>
+            <td>
+              <input type="number" class="form-input" id="l_hour_off" name="l_hour_off" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_minute_off" name="l_minute_off" style="width: 60px;" required>
+              <input type="number" class="form-input" id="l_second_off" name="l_second_off" style="width: 60px;" required>
+            </td>
+          </tr>
+        </table>
         <p>
           <input class="btn btn-danger" type="submit" value="Set" style="width: 100%; height: 40px;">
         </p>
@@ -494,11 +514,18 @@
 
   <!-- VARIABLE -->
   <script type="text/javascript">
-    var URL = "http://localhost:8088";
+    var URL = "http://188.166.210.151:8088";
 
     var lightState = false;
     var fanState = false;
     var waterState = false;
+
+    var l_hour_on = 18;
+    var l_minute_on = 0;
+    var l_second_on = 0;
+    var l_hour_off = 5;
+    var l_minute_off = 0;
+    var l_second_off = 0;
   </script>
 
   <!-- Get init data setting -->
@@ -527,6 +554,16 @@
       document.getElementById('maxSoilHumidity').value = responseText.split('-')[5];
     }
 
+    function setTimeValueSetting() {
+      document.getElementById('l_hour_on').value = l_hour_on;
+      document.getElementById('l_minute_on').value = l_minute_on;
+      document.getElementById('l_second_on').value = l_second_on;
+      document.getElementById('l_hour_off').value = l_hour_off;
+      document.getElementById('l_minute_off').value = l_minute_off;
+      document.getElementById('l_second_off').value = l_second_off;
+    }
+
+    setTimeValueSetting();
     initDataSetting();
   </script>
 
@@ -884,7 +921,7 @@
   </script>
 
   <!-- Auto ON/OFF -->
-  <script>
+  <script type="text/javascript">
     document.getElementById('autoCheckbox').addEventListener('change', function() {
       const autoInfoDiv = document.querySelector('.auto-info');
       if (!this.checked) {
@@ -893,6 +930,42 @@
         autoInfoDiv.classList.remove('disable');
       }
     });
+  </script>
+
+  <!-- LIGHT ON/OFF -->
+  <script type="text/javascript">
+    function toggleLightDaily(element) {
+      const xhr = new XMLHttpRequest();
+      if (element) {
+        xhr.open('GET', '/light/on', true);
+      } else {
+        xhr.open('GET', '/light/off', true);
+      }
+      xhr.send();
+    }
+
+    function getTimeUntilNextTime(hour, minute, second) {
+      const now = new Date();
+      const nextTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, second, 0);
+
+      if (now > nextTime) {
+        nextTime.setDate(nextTime.getDate() + 1);
+      }
+      return nextTime - now;
+    }
+
+    function setupDailyTurnLight(hour, minute, second, isOn) {
+      const timeUntilNextTime = getTimeUntilNextTime(hour, minute, second);
+      console.log(timeUntilNextTime);
+
+      setTimeout(() => {
+        toggleLightDaily(isOn);
+        setInterval(toggleLightDaily(isOn), 24 * 60 * 60 * 1000); // 24h
+      }, timeUntilNextTime);
+    }
+
+    setupDailyTurnLight(l_hour_on, l_minute_on, l_second_on, true);
+    setupDailyTurnLight(l_hour_off, l_minute_off, l_second_off, false);
   </script>
 
   <!-- Device ON/OFF - Func -->
@@ -940,7 +1013,7 @@
 
   <!-- SETTING -->
   <script type="text/javascript">
-    document.getElementById('tempForm').addEventListener('submit', function(event) {
+    document.getElementById('settingForm').addEventListener('submit', function(event) {
       event.preventDefault();
 
       const minTemperature = document.getElementById('minTemperature').value;
@@ -961,6 +1034,16 @@
         .then(data => {
           alert(data);
         });
+
+      l_hour_on = document.getElementById('l_hour_on').value;
+      l_minute_on = document.getElementById('l_minute_on').value;
+      l_second_on = document.getElementById('l_second_on').value;
+      l_hour_off = document.getElementById('l_hour_off').value;
+      l_minute_off = document.getElementById('l_minute_off').value;
+      l_second_off = document.getElementById('l_second_off').value;
+      setTimeValueSetting();
+      setupDailyTurnLight(l_hour_on, l_minute_on, l_second_on, true);
+      setupDailyTurnLight(l_hour_off, l_minute_off, l_second_off, false);
     });
   </script>
 </body>
