@@ -11,8 +11,8 @@
 DHT dht(DHTPIN, DHTTYPE);
 
 // Wifi info
-const char* ssid = "FPT Telecom";
-const char* password = "88888888";
+const char* ssid = "FSB-Guest";
+const char* password = "fsb@guest";
 
 // Webserver, port 80
 ESP8266WebServer server(80);
@@ -29,6 +29,9 @@ const char* html = R"html(
   <title>Sensors Dashboard</title>
   <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
     body {
@@ -38,6 +41,29 @@ const char* html = R"html(
       font-weight: 500;
       font-style: normal;
       font-size: 14px;
+    }
+
+    img {
+      width: 24%;
+      margin: 2px;
+    }
+
+    .loader {
+      border: 10px solid #f3f3f3;
+      border-top: 10px solid #3498db;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 2s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
     }
 
     .table th {
@@ -445,6 +471,16 @@ const char* html = R"html(
         </form>
       </div>
       <div id="chartReport" style="height: 280px"></div>
+
+      <br>
+      <form id="chatForm">
+        <textarea id="prompt" rows="4" placeholder="Enter your prompt" hidden></textarea>
+        <input class="btn btn-danger" type="submit" value="Evaluate" style="width: 100%; height: 40px;">
+      </form>
+      <div style="margin-top: 50px; justify-content: center;" class="d-flex">
+        <div class="loader" id="loader"></div>
+      </div>
+      <div id="chatLog" style="margin-top: 16px;"></div>
     </div>
 
     <div id="Tab4" class="tab-content">
@@ -498,6 +534,10 @@ const char* html = R"html(
       </table>
     </div>
 
+    <div id="Tab5" class="tab-content">
+      <h2>Images</h2>
+      <div id="images"></div>
+    </div>
   </div>
 
   <nav class="d-flex justify-content-between align-items-center">
@@ -524,11 +564,16 @@ const char* html = R"html(
     <a href="javascript:void(0)" onclick="openTab(event, 'Tab2')">SETTING</a>
     <a href="javascript:void(0)" onclick="openTab(event, 'Tab3')">REPORT</a>
     <a href="javascript:void(0)" onclick="openTab(event, 'Tab4')">COUNT</a>
+    <a href="javascript:void(0)" onclick="openTab(event, 'Tab5')">IMAGES</a>
   </div>
 
   <!-- VARIABLE -->
   <script type="text/javascript">
     var URL = "http://188.166.210.151:8088";
+
+    var humidityAir = [];
+    var humiditySoil = [];
+    var temperature = [];
 
     var lightState = false;
     var fanState = false;
@@ -856,9 +901,9 @@ const char* html = R"html(
             alert("No data");
           } else {
             const keys = Object.keys(data).slice(4);
-            const humidityAir = Object.values(data.humidityAir).slice(4);
-            const humiditySoil = Object.values(data.humiditySoil).slice(4);
-            const temperature = Object.values(data.temperature).slice(4);
+            humidityAir = Object.values(data.humidityAir).slice(4);
+            humiditySoil = Object.values(data.humiditySoil).slice(4);
+            temperature = Object.values(data.temperature).slice(4);
 
             const hourKeys = Array.from({
               length: 24
@@ -1071,6 +1116,98 @@ const char* html = R"html(
       setupDailyTurnLight(l_hour_off, l_minute_off, l_second_off, false);
     });
   </script>
+
+  <!-- CHAT GPT -->
+  <script type="text/javascript">
+    const apiKey = 'sk-None-nIEn5xvHFEUoRkzIJqZAT3BlbkFJQ75jwYzrFw5EyXJV5wnK';
+
+    const loader = document.getElementById("loader");
+    const content = document.getElementById("chatLog");
+    loader.style.display = "none";
+
+    document.getElementById('chatForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      loader.style.display = "block";
+
+      const prompt = `Tôi có 3 mảng dữ liệu về nhiệt độ, độ ẩm không khí và độ ẩm đất theo từng giờ như sau:
+      [${temperature}]
+      [${humidityAir}]
+      [${humiditySoil}]
+Đây là các dữ liệu từ cảm biến trong môi trường nhà kính đang trồng Lúa, hãy đánh giá các thông số giúp tôi theo các ý sau:
+      1. Các thông số nào đã phù hợp và không phù hợp, vì sao?
+      2. Cần cải tiến hay điều chỉnh các thông số nào cho tối ưu việc trồng Lúa
+      3. Tư vấn thêm các giải pháp tốt hơn có thể
+      `;
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages: [{
+              role: 'system',
+              content: 'You are a helpful assistant.'
+            }, {
+              role: 'user',
+              content: prompt
+            }]
+          })
+        });
+
+        const data = await response.json();
+        const markdownContent = data.choices[0].message.content;
+        const htmlContent = marked.parse(markdownContent, {
+          highlight: function(code, lang) {
+            const validLanguage = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(validLanguage, code).value;
+          }
+        });
+        addMessage(htmlContent, 'bot-message');
+      } catch (error) {
+        addMessage(`Error: ${error.message}`, 'bot-message');
+      }
+      loader.style.display = "none";
+    });
+
+    function addMessage(content, className) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${className}`;
+      messageDiv.innerHTML = content;
+      document.getElementById('chatLog').appendChild(messageDiv);
+
+      document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
+  </script>
+
+  <script>
+    // URL của API (thay 'xxx' bằng URL thực tế của bạn)
+    const apiURL = `${URL}/api/images`;
+
+    // Gọi API và xử lý kết quả
+    fetch(apiURL)
+      .then(response => response.json())
+      .then(data => {
+        const imagesContainer = document.getElementById('images');
+
+        // Giả sử data là một mảng các URL hình ảnh
+        data.forEach(imageUrl => {
+          const imgElement = document.createElement('img');
+          imgElement.src = `${URL}` + imageUrl.name;
+          imgElement.alt = 'Image from API';
+          imagesContainer.appendChild(imgElement);
+        });
+      })
+      .catch(error => {
+        console.error('Error fetching images:', error);
+      });
+  </script>
 </body>
 
 </html>
@@ -1096,7 +1233,7 @@ float minSoilHumidityThreshold = 50.0;
 float maxSoilHumidityThreshold = 70.0;
 
 // URL
-const char* serverUrl = "http://192.168.100.245:8088/api/device/state/add";
+const char* serverUrl = "http://188.166.210.151:8088/api/device/state/add";
 
 //
 long getCurrentTimestamp() {
